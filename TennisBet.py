@@ -1,4 +1,5 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 
 score = 1
 
@@ -53,24 +54,55 @@ players_df['matches_played'] = 0
 players_df['peak_elo'] = 1500
 players_df['peak_elo_date'] = 'N/A'
 
+players_df['current_elo'] = players_df['current_elo'].astype(float)
+players_df['peak_elo'] = players_df['peak_elo'].astype(float)
+
 players_dict = players_df.set_index('player_id').to_dict('index')
+elo_ratings_annual = {}
+default_value = 1500
+name_mapping = {row['player_id']: f"{row['name_first']} {row['name_last']}" for index, row in players_df.iterrows()}
 
-try:
-    for year in range(2000, 2023):
-        matches_df = pd.read_csv(f'atp_matches_{year}.csv')
-        matches_df.apply(lambda row: update_player_stats(row, players_dict, k_factor, score), axis=1)
-        
-        # Prompt to stop the script
-        if input("Press Enter to continue or type 'stop' to stop the script: ") == 'stop':
-            break
 
-        # Update players_df from players_dict (outside the if statement)
-        for player_id, player_data in players_dict.items():
-            for key, value in player_data.items():
-                players_df.loc[players_df['player_id'] == player_id, key] = value
+for year in range(2000, 2024):
+    matches_df = pd.read_csv(f'atp_matches_{year}.csv')
+    matches_df.apply(lambda row: update_player_stats(row, players_dict, k_factor, score), axis=1)
+    print(year)
 
-except KeyboardInterrupt:
-    print("Script stopped by user.")
+    # Update players_df from players_dict (outside the if statement)
+    for player_id, player_data in players_dict.items():
+        for key, value in player_data.items():
+            players_df.loc[players_df['player_id'] == player_id, key] = value
 
+    top_10_players = sorted(players_dict.items(), key=lambda x: x[1]['current_elo'], reverse=True)[:10]
+    top_10_names = {name_mapping[player_id]: data['current_elo'] for player_id, data in top_10_players}
+    elo_ratings_annual[year] = top_10_names
+
+    # Print the top 10 players for the year
+    # print(f"Top 10 players for {year}:")
+    # for player_id, data in top_10_players:
+    #     print(f"Player ID: {player_id}, Elo Rating: {data['current_elo']}")
+
+
+# Initialize player_ratings_over_time with player names
+player_ratings_over_time = {name: [] for name in top_10_names}
+
+years = list(range(2000, 2024))
+sorted_years = sorted(elo_ratings_annual.keys())
+for year in sorted_years:
+    for player_name in player_ratings_over_time:
+        rating = elo_ratings_annual[year].get(player_name, default_value)
+        player_ratings_over_time[player_name].append(rating)
+
+# Plotting after completing the yearly loop
+for player_name, ratings in player_ratings_over_time.items():
+    plt.plot(years, ratings, marker='o', label=player_name)
+
+plt.title('Top 10 Tennis Players Elo Ratings Over Years')
+plt.xlabel('Year')
+plt.ylabel('Elo Rating')
+plt.xticks(years)
+plt.legend()
+plt.grid(True)
+plt.show()
 
 players_df.to_csv('2023_YE_elo_rankings.csv')
