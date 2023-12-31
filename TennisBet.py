@@ -56,7 +56,7 @@ players_df['peak_elo_date'] = 'N/A'
 players_dict = players_df.set_index('player_id').to_dict('index')
 
 try:
-    for year in range(2022, 2023):
+    for year in range(2000, 2023):
         matches_df = pd.read_csv(f'atp_matches_{year}.csv')
         matches_df.apply(lambda row: update_player_stats(row, players_dict, k_factor, score), axis=1)
         
