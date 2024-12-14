@@ -19,19 +19,16 @@ def calc_exp_score(playerA_elo, playerB_elo):
 def update_elo(old_elo, k, actual_score, expected_score):
     return old_elo + k * (actual_score - expected_score)
 
-def update_player_stats(row, k_factor_func):
+def update_player_stats(row, players_dict, k_factor_func):
     winner_id, loser_id = str(row['winner_id']), str(row['loser_id'])
     tourney_date = row['tourney_date']
 
-    winner_data = redis_client.get(winner_id)
-    loser_data = redis_client.get(loser_id)
-
-    if not winner_data or not loser_data:
+    if winner_id not in players_dict or loser_id not in players_dict:
         print(f"Player ID missing: winner_id={winner_id}, loser_id={loser_id}")
         return
 
-    winner_data = json.loads(winner_data)
-    loser_data = json.loads(loser_data)
+    winner_data = players_dict[winner_id]
+    loser_data = players_dict[loser_id]
 
     winner_elo = winner_data['current_elo']
     loser_elo = loser_data['current_elo']
@@ -55,11 +52,7 @@ def update_player_stats(row, k_factor_func):
         winner_data['peak_elo'] = updated_winner_elo
         winner_data['peak_elo_date'] = tourney_date
 
-    # Store updated data back in Redis
-    redis_client.set(winner_id, json.dumps(winner_data))
-    redis_client.set(loser_id, json.dumps(loser_data))
-
-# Load players data into Redis
+# Load players data into Python dictionary 
 players_df = pd.read_csv('csv/atp_players.csv', usecols=['player_id', 'name_first', 'name_last', 'ioc'])
 players_df.rename(columns={'ioc': 'country'}, inplace=True)
 players_df['current_elo'] = 1500
@@ -68,29 +61,24 @@ players_df['peak_elo'] = 1500
 players_df['peak_elo_date'] = 'N/A'
 players_df['player_id'] = players_df['player_id'].astype(str)
 
-# Store each player's data in a single Redis hash named 'players_data'
-for _, player in players_df.iterrows():
-    redis_client.hset('players_data', player['player_id'], player.to_json())
-
+# Initialize players dictionary
+players_dict = players_df.set_index('player_id').to_dict('index')
 
 # Process matches and update Elo ratings
 for year in range(2010, 2025):
     print(f"Starting processing for {year}'s matches")
     for chunk in pd.read_csv(f'csv/matches/atp_matches_{year}.csv', chunksize=1000):
         start_time = time.time()
-        chunk.apply(lambda row: update_player_stats(row, k_factor), axis=1)
+        chunk.apply(lambda row: update_player_stats(row, players_dict, k_factor), axis=1)
         elapsed_time = time.time() - start_time
         print(f"Processed chunk in {elapsed_time:.2f} seconds")
 
-        # Backup results to disk after each batch
-        # Retrieve all players' data from the Redis hash
-        players_backup = {
-            key.decode(): json.loads(value) 
-            for key, value in redis_client.hgetall('players_data').items()
-        }
-
+# Store updated player data in Redis (final persistence)
+with redis_client.pipeline() as pipe:
+    for player_id, player_data in players_dict.items():
+        pipe.hset('players_data', player_id, json.dumps(player_data))
+    pipe.execute()
 
 # Save updated player data to CSV
-players_data = [json.loads(value) for key, value in redis_client.hgetall('players_data').items()]
-players_df = pd.DataFrame(players_data)
+players_df = pd.DataFrame.from_dict(players_dict, orient='index')
 players_df.to_csv('2023_YE_elo_rankings.csv', index=False)
