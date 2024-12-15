@@ -13,11 +13,9 @@ def update_elo(old_elo, k, actual_score, expected_score):
     return old_elo + k * (actual_score - expected_score)
 
 def update_player_stats(row, redis_client, k_factor_func):
-    # Extract winner and loser IDs
     winner_id, loser_id = str(row['winner_id']), str(row['loser_id'])
     tourney_date = row['tourney_date']
 
-    # Fetch player data from Redis
     winner_data = redis_client.hget('players_data', winner_id)
     loser_data = redis_client.hget('players_data', loser_id)
 
@@ -25,11 +23,9 @@ def update_player_stats(row, redis_client, k_factor_func):
         print(f"Player ID missing: winner_id={winner_id}, loser_id={loser_id}")
         return
 
-    # Deserialize player data
     winner_data = json.loads(winner_data)
     loser_data = json.loads(loser_data)
 
-    # Perform Elo calculations
     winner_elo = winner_data['current_elo']
     loser_elo = loser_data['current_elo']
 
@@ -52,6 +48,5 @@ def update_player_stats(row, redis_client, k_factor_func):
         winner_data['peak_elo'] = updated_winner_elo
         winner_data['peak_elo_date'] = tourney_date
 
-    # Write updated player data back to Redis
     redis_client.hset('players_data', winner_id, json.dumps(winner_data))
     redis_client.hset('players_data', loser_id, json.dumps(loser_data))
