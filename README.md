@@ -26,13 +26,16 @@ This project implements a distributed system to calculate Tennis Elo ratings for
 ```
 tennis_elo_distributed/ 
 ├── producer.py # Sends tournament batches to RabbitMQ 
-├── consumer.py # Processes tournaments and updates Redis 
-├── utils/ │ 
-├── elo_utils.py # Elo calculation functions │ 
-├── redis_utils.py # Redis connection and helper functions │ 
+├── consumer.py # Processes tournaments and updates Redis
+├── initialize_players.py # Initializes players to redis
+├── scraper.py # Webscraper to keep elos accurate
+├── utils/
+├── elo_utils.py   # Elo calculation functions 
+├── redis_utils.py # Redis connection and helper functions 
 ├── queue_utils.py # RabbitMQ utilities 
-├── data/ │ ├── atp_players.csv # Player data 
-│ └── matches/ # Yearly match data 
+├── data/ 
+├── atp_players.csv  # Player data 
+│ └── matches/       # Yearly match data 
 ├── requirements.txt # Dependencies 
 └── README.md 
 ```
