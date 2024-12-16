@@ -55,7 +55,7 @@ tennis_elo_distributed/
    ```
 3. **Initialize Redis**:
    ```bash
-   python -c "from utils.redis_utils import initialize_redis; initialize_redis(redis_client, 'data/atp_players.csv')"
+   python initialize_players.py
    ```
 4. **Run Producer**:
    ```bash
