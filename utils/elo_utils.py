@@ -26,8 +26,10 @@ def update_player_stats(row, redis_client, k_factor_func):
     winner_data = json.loads(winner_data)
     loser_data = json.loads(loser_data)
 
-    winner_elo = winner_data['current_elo']
-    loser_elo = loser_data['current_elo']
+    winner_elo = float(winner_data['current_elo'])
+    loser_elo = float(loser_data['current_elo'])
+    winner_data['matches_played'] = int(winner_data['matches_played'])
+    loser_data['matches_played'] = int(loser_data['matches_played'])
 
     exp_score_winner = calc_exp_score(winner_elo, loser_elo)
     exp_score_loser = 1 - exp_score_winner
@@ -50,3 +52,4 @@ def update_player_stats(row, redis_client, k_factor_func):
 
     redis_client.hset('players_data', winner_id, json.dumps(winner_data))
     redis_client.hset('players_data', loser_id, json.dumps(loser_data))
+
