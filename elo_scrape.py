@@ -2,7 +2,6 @@ import redis
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-import json
 from utils.redis_utils import get_player_data_by_name
 from utils.redis_utils import set_player_data_by_name
 

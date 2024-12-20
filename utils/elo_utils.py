@@ -53,3 +53,58 @@ def update_player_stats(row, redis_client, k_factor_func):
     redis_client.hset('players_data', winner_id, json.dumps(winner_data))
     redis_client.hset('players_data', loser_id, json.dumps(loser_data))
 
+def update_player_stats_from_match(match, redis_client, k_factor_func):
+
+    winner_name = match['winner']['name'].lower().strip()
+    loser_name = match['loser']['name'].lower().strip()
+    tournament_date = match['tournament_date']
+
+    winner_id = redis_client.hget('player_name_to_id', winner_name)
+    loser_id = redis_client.hget('player_name_to_id', loser_name)
+
+    if not winner_id or not loser_id:
+        print(f"Player ID missing for names: winner_name={winner_name}, loser_name={loser_name}")
+        return
+
+    winner_id = winner_id.decode('utf-8') if isinstance(winner_id, bytes) else winner_id
+    loser_id = loser_id.decode('utf-8') if isinstance(loser_id, bytes) else loser_id
+
+    winner_data = redis_client.hget('players_data', winner_id)
+    loser_data = redis_client.hget('players_data', loser_id)
+
+    if not winner_data or not loser_data:
+        print(f"Player data missing in Redis for winner_id={winner_id}, loser_id={loser_id}")
+        return
+
+    winner_data = json.loads(winner_data)
+    loser_data = json.loads(loser_data)
+
+    winner_elo = float(winner_data['current_elo'])
+    loser_elo = float(loser_data['current_elo'])
+    winner_data['matches_played'] = int(winner_data['matches_played'])
+    loser_data['matches_played'] = int(loser_data['matches_played'])
+
+    exp_score_winner = calc_exp_score(winner_elo, loser_elo)
+    exp_score_loser = 1 - exp_score_winner
+
+    k_winner = k_factor_func(winner_data['matches_played'])
+    k_loser = k_factor_func(loser_data['matches_played'])
+
+    winner_data['matches_played'] += 1
+    loser_data['matches_played'] += 1
+
+    updated_winner_elo = update_elo(winner_elo, k_winner, 1, exp_score_winner)
+    updated_loser_elo = update_elo(loser_elo, k_loser, 0, exp_score_loser)
+
+    winner_data['current_elo'] = updated_winner_elo
+    loser_data['current_elo'] = updated_loser_elo
+
+    if updated_winner_elo > winner_data['peak_elo']:
+        winner_data['peak_elo'] = updated_winner_elo
+        winner_data['peak_elo_date'] = tournament_date
+
+    redis_client.hset('players_data', winner_id, json.dumps(winner_data))
+    redis_client.hset('players_data', loser_id, json.dumps(loser_data))
+
+    print(f"Updated Elo for match {match['match_id']} - Winner: {winner_name}, Loser: {loser_name}")
+

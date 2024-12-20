@@ -1,6 +1,8 @@
 import pika
 import pandas as pd
 import json
+from api import get_final_matches
+
 
 def send_tournament_batches_to_queue():
     connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
@@ -28,5 +30,21 @@ def send_tournament_batches_to_queue():
     
     connection.close()
 
+def send_matches_to_queue():
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    channel.queue_declare(queue='elo_tournament_queue')
+    matches = get_final_matches()
+
+    for match in matches:
+        channel.basic_publish(
+            exchange='',
+            routing_key='elo_tournament_queue',
+            body=json.dumps(match)  
+        )
+        print(f"Sent match {match['match_id']} to the queue.")
+
+    connection.close()
+
 if __name__ == "__main__":
-    send_tournament_batches_to_queue()
+    send_matches_to_queue()

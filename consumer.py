@@ -1,6 +1,6 @@
 import pika
 import json
-from utils.elo_utils import update_player_stats, k_factor
+from utils.elo_utils import update_player_stats, k_factor, update_player_stats_from_match
 from utils.redis_utils import redis_client
 from redis.exceptions import LockError
 
@@ -35,14 +35,42 @@ def process_tournament_with_locks(batch):
             if player_id in locks:
                 locks[player_id].release()
 
+def process_match_with_locks(match):
+    winner_id = match['winner']['id']
+    loser_id = match['loser']['id']
 
-def on_message_received(ch, method, properties, body):
+    print(f"Processing match {match['match_id']} between {match['winner']['name']} and {match['loser']['name']}.")
+
+    locks = {}
+    try:
+        for player_id in [winner_id, loser_id]:
+            locks[player_id] = redis_client.lock(f"player_lock:{player_id}", timeout=30)
+            if not locks[player_id].acquire(blocking=True):
+                raise LockError(f"Failed to acquire lock for player {player_id}")
+
+        update_player_stats_from_match(match, redis_client, k_factor)
+
+    finally:
+        for player_id in locks:
+            locks[player_id].release()
+
+
+def on_message_received_tournament(ch, method, properties, body):
     batch = json.loads(body)
     try:
         process_tournament_with_locks(batch)
         ch.basic_ack(delivery_tag=method.delivery_tag)
     except Exception as e:
         print(f"Error processing tournament: {e}")
+        ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+
+def on_message_received(ch, method, properties, body):
+    try:
+        match = json.loads(body)
+        process_match_with_locks(match)
+        ch.basic_ack(delivery_tag=method.delivery_tag)
+    except Exception as e:
+        print(f"Error processing match: {e}")
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
 
 # RabbitMQ consumer setup
