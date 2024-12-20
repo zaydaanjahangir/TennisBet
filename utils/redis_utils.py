@@ -29,8 +29,6 @@ def initialize_redis(redis_client, players_file):
 
     print(f"Redis initialized with {len(players_df)} players.")
 
-
-
 def save_redis_to_csv(redis_client, output_file):
     players_data = [
         json.loads(value)

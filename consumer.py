@@ -1,8 +1,9 @@
 import pika
 import json
 from utils.elo_utils import update_player_stats, k_factor, update_player_stats_from_match
-from utils.redis_utils import redis_client
+from utils.redis_utils import redis_client, save_redis_to_csv
 from redis.exceptions import LockError
+
 
 def process_tournament_with_locks(batch):
     tourney_id = batch['tourney_id']
@@ -54,7 +55,6 @@ def process_match_with_locks(match):
         for player_id in locks:
             locks[player_id].release()
 
-
 def on_message_received_tournament(ch, method, properties, body):
     batch = json.loads(body)
     try:
@@ -69,9 +69,11 @@ def on_message_received(ch, method, properties, body):
         match = json.loads(body)
         process_match_with_locks(match)
         ch.basic_ack(delivery_tag=method.delivery_tag)
+        save_redis_to_csv(redis_client, "current_elo.csv")
     except Exception as e:
         print(f"Error processing match: {e}")
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+
 
 # RabbitMQ consumer setup
 connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
@@ -81,4 +83,12 @@ channel.basic_qos(prefetch_count=1)
 channel.basic_consume(queue='elo_tournament_queue', on_message_callback=on_message_received)
 
 print("Worker started. Waiting for tasks...")
-channel.start_consuming()
+try:
+    channel.start_consuming()
+except KeyboardInterrupt:
+    print("Consumer process exited. Cleaning up...")
+    channel.stop_consuming()  
+finally:
+    connection.close()  
+    print("Connection closed.")
+
