@@ -5,7 +5,6 @@ import time
 from api import get_final_matches
 from utils.redis_utils import redis_client
 from apscheduler.schedulers.background import BackgroundScheduler
-from producer import send_matches_to_queue
 
 def run_producer():
     print("Running Producer...")
