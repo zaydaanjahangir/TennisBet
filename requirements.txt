@@ -2,3 +2,6 @@ pandas
 redis
 pika
 beautifulsoup4
+requests
+python-dotenv
+apscheduler

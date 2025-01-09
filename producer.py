@@ -63,8 +63,10 @@ def send_matches_to_queue():
     connection.close()
 
 if __name__ == "__main__":
+    print("Starting Producer scheduler...")
     scheduler = BackgroundScheduler()
-    scheduler.add_job(run_producer, 'interval', hours=6)  # Runs every 6 hours
+    scheduler.add_job(
+        run_producer, 'interval', hours=6) 
     scheduler.start()
 
     print("Producer scheduler started. Press Ctrl+C to exit.")
