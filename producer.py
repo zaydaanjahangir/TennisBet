@@ -66,9 +66,13 @@ if __name__ == "__main__":
     print("Starting Producer scheduler...")
     scheduler = BackgroundScheduler()
     scheduler.add_job(
-        run_producer, 'interval', hours=6) 
+        run_producer,
+        'interval',
+        hours=6,
+        max_instances=1,  
+        misfire_grace_time=None  
+    )
     scheduler.start()
-
     print("Producer scheduler started. Press Ctrl+C to exit.")
     try:
         while True:
