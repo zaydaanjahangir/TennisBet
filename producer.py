@@ -2,9 +2,14 @@ import pika
 import pandas as pd
 import json
 import time
+from flask import Flask, send_file
 from api import get_final_matches
 from utils.redis_utils import redis_client
 from apscheduler.schedulers.background import BackgroundScheduler
+
+app = Flask(__name__) 
+
+scheduler = BackgroundScheduler()
 
 def run_producer():
     print("Running Producer...")
@@ -15,7 +20,6 @@ def send_tournament_batches_to_queue():
     channel = connection.channel()
     channel.queue_declare(queue='elo_tournament_queue')
 
-    # Load match data and group by tournaments
     years = range(2010, 2024)
     for year in years:
         matches_file = f"data/matches/atp_matches_{year}.csv"
@@ -62,20 +66,32 @@ def send_matches_to_queue():
 
     connection.close()
 
+@app.route("/current-elo.csv", methods=["GET"])
+def serve_csv():
+    try:
+        return send_file("data/current_elo.csv", mimetype="text/csv")
+    except Exception as e:
+        return {"error": str(e)}, 500
+
+
+
 if __name__ == "__main__":
+    print("Running initial producer job...")
+    run_producer()
+
     print("Starting Producer scheduler...")
-    scheduler = BackgroundScheduler()
     scheduler.add_job(
         run_producer,
         'interval',
         hours=6,
-        max_instances=1,  
-        misfire_grace_time=None  
+        max_instances=1,
+        misfire_grace_time=3600
     )
     scheduler.start()
-    print("Producer scheduler started. Press Ctrl+C to exit.")
+    print("Producer scheduler started. Flask app is running...")
+
     try:
-        while True:
-            time.sleep(1)
+        # Run Flask app, bind to all network interfaces
+        app.run(host="0.0.0.0", port=5000)
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
